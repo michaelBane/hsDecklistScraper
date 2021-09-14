@@ -94,7 +94,7 @@ View(videoMetadata)
 View(deckCodes)
 View(decks)
 
-# write_csv(videoMetadata, 'data/videoMetadata.csv')
-# write_csv(deckCodes, 'data/deckCodes.csv')
-# write_csv(decks, 'data/decks.csv')
+# write_csv(videoMetadata, 'hsStreamerdb/data/videoMetadata.csv')
+# write_csv(deckCodes, 'hsStreamerdb/data/deckCodes.csv')
+# write_csv(decks, 'hsStreamerdb/data/decks.csv')
 
