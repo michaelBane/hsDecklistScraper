@@ -3,9 +3,12 @@ library(tidyverse)
 library(tuber)
 library(jsonlite)
 library(reticulate)
+use_condaenv('hearthstoneDB',
+             required = TRUE)
+hs <- import('hearthstone')
 
-#Test variables. These will need to be derived. 
-videoId <- "m50rm7ZATV0"
+# Manually curate channel ids
+channelId <- 'UCVjzQsZzQ4lmyIrmSKJjiog' #Roffle
 
 # Import HS Data
 apiURL <- 'https://api.hearthstonejson.com/v1/91456/enUS/cards.collectible.json'
@@ -19,27 +22,35 @@ secret <- 'Zs1XgYb-euX9I_FY9BA6BvJO'
 yt_oauth(clientID, 
          secret)
 
-# Call API
-metaData <- get_video_details(video_id=videoId)
-videoDescription <- metaData$items[[1]]$snippet$description
+channelVideos <- get_all_channel_video_stats(channel_id = channelId) #approx 2 mins
+
+videoMetadata <- channelVideos %>%
+  tibble() %>%
+  select(id, title, publication_date, description, channel_title, url) %>%
+  mutate(publication_date = lubridate::as_datetime(publication_date))
+
+videoDescriptions <- videoMetadata$description
 
 # Find all of the initial deck-string patterns
 # Remove characters prior to deck codes, then extract all chars from start to first non-alphanumeric. 
 # regex: https://www.geeksforgeeks.org/python-program-to-extract-string-till-first-non-alphanumeric-character/
-deckCodes <- videoDescription %>% 
-  str_sub(start = str_locate_all(videoDescription, 'AAEB')[[1]][,'start']) %>%
-  str_extract("[\\dA-Za-z\\w+\\w/\\w=]*") %>%
-  unique()
+
+deckCodes <- NULL
+for(i in 1:length(videoDescriptions)){
+  
+  deckCode <- videoDescriptions[i] %>% 
+    str_sub(start = str_locate_all(videoDescriptions[i], 'AAEB')[[1]][,'start']) %>%
+    str_extract("[\\dA-Za-z\\w+\\w/\\w=]*") %>%
+    unique()
+  
+  deckCodes <- c(deckCodes, deckCode)
+  
+}
+deckCodes
 
 # Parse deckcodes.
-use_condaenv('hearthstoneDB',
-             required = TRUE)
-
-hs <- import('hearthstone')
-
+decks <- NULL
 for(i in deckCodes){
-  
-  print(1)
   
   parsedDecklist <- hs$deckstrings$parse_deckstring(i)
   
@@ -67,12 +78,13 @@ for(i in deckCodes){
            SpellSchool = spellSchool,
            Tribe = race) %>%
     arrange(Cost,
-            Card)
+            Card) %>%
+    mutate(fullDeck = sum(Copies) == 30,
+           id = i) #needs to be replaced.
   
-  print(deckData)
-  
-  # Check 30 cards in deck.  
-  print(sum(deckData$Copies) == 30)
-  
+  decks = bind_rows(decks, deckData)
+
 }
 
+View(videoMetadata)
+View(decks)
