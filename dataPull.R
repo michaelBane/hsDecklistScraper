@@ -18,7 +18,7 @@ hsCardData <- fromJSON(apiURL) %>% tibble()
 # Import YT Data.
 # Authenticate
 clientID <- '573231105362-p1mtfdnavthjtoq84nivib1scob8ph0n.apps.googleusercontent.com'
-secret <- 'Zs1XgYb-euX9I_FY9BA6BvJO'
+secret <- rstudioapi::askForPassword() 
 
 yt_oauth(clientID, 
          secret)
