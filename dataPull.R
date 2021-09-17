@@ -1,7 +1,7 @@
 # Pull YouTube video descriptions and extract deck-lists.
 library(tidyverse)
 library(tuber)
-library(jsonlite)
+#library(jsonlite)
 library(reticulate)
 use_condaenv('hearthstoneDB',
              required = TRUE)
@@ -15,10 +15,6 @@ creator <- creatorLookup[n, 1]$Creator
 channelId <- creatorLookup[n, 2]$channelID
 creator
 channelId
-
-# Import HS Data
-# apiURL <- 'https://api.hearthstonejson.com/v1/91456/enUS/cards.collectible.json'
-# hsCardData <- fromJSON(apiURL) %>% tibble()
 
 # Import YT Data.
 # Authenticate
