@@ -1,7 +1,6 @@
-# Pull YouTube video descriptions and extract deck-lists.
+# Pull backlog of YouTube video descriptions and extract deck-lists.
 library(tidyverse)
 library(tuber)
-#library(jsonlite)
 library(reticulate)
 use_condaenv('hearthstoneDB',
              required = TRUE)
@@ -10,7 +9,7 @@ hs <- import('hearthstone')
 # Manually curate channel ids
 creatorLookup <- read_csv('hsStreamerDB/data/creatorLookup.csv')
 
-n <- 8 # Iterate over this to extract backfills.
+n <- 1 # Iterate over this to extract backfills.
 creator <- creatorLookup[n, 1]$Creator
 channelId <- creatorLookup[n, 2]$channelID
 creator
@@ -81,7 +80,6 @@ for(i in 1:nrow(deckCodes)){
 View(channelVideos)
 View(deckCodes)
 View(decks)
-#view(hsCardData)
 
 write_csv(channelVideos, glue::glue('hsStreamerdb/data/channelVideos_{creator}.csv'))
 write_csv(deckCodes, glue::glue('hsStreamerdb/data/deckCodes_{creator}.csv'))
