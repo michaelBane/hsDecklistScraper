@@ -10,6 +10,7 @@ library(shiny)
 library(tidyverse)
 library(DT)
 library(glue)
+library(markdown)
 
 # Import HS Data
 hsCardData <- read_csv('data/hsCardDataUnnested.csv',
@@ -59,13 +60,18 @@ data3 <- read_csv('data/decks_All.csv') %>%
 
 appData <- inner_join(data1, 
                       data3,
-                      by = c('id' = 'id.x'))
+                      by = c('id' = 'id.x')) %>%
+    mutate(Deck = glue('<a href="https://playhearthstone.com/en-us/deckbuilder?deckcode={deckCode}">link</a>'),
+           Youtube = glue('<a href="{url}">link</a>'),
+           HSReplay= glue('<a href="https://hsreplay.net/decks/{deckCode}">link</a>'),
+           Published = lubridate::as_date(publication_date))
 
 classes <- sort(unique(data3$deckClass))
 creators <- sort(unique(data1$channel_title))
 tribes <- sort(unique(data3$race))
 spellSchools <- sort(unique(data3$spellSchool))
-mechanics <- sort(unique(data3$mechanics))
+cards <- sort(unique(data3$name))
+#mechanics <- sort(unique(data3$mechanics))
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -95,15 +101,12 @@ ui <- fluidPage(
                         selected = classes,
                         multiple = TRUE),
             
-            textInput(inputId = 'cardChoice',
-                      label = 'Contains Card:',
-                      value = '',
-                      placeholder = "Yogg"),
-
-            textInput(inputId = 'notCardChoice',
-                      label = 'Does Not Contains Card:',
-                      value = 'Replace this text with a card to exclude',
-                      placeholder = "Oh My Yogg!"),
+            selectInput(inputId = 'cardChoice',
+                        label = 'Find Cards:',
+                        choices = cards,
+                        multiple = TRUE),
+            
+            helpText('Multiple inputs return decks with either card, not both'),
             
             selectInput(inputId = 'tribeChoice',
                         label = 'Deck Contains Tribes:',
@@ -117,13 +120,16 @@ ui <- fluidPage(
                         selected = spellSchools,
                         multiple = TRUE),
             
-            selectInput(inputId = 'mechanicChoice',
-                        label = 'Deck Contains Mechanics:',
-                        choices = mechanics,
-                        selected = mechanics,
-                        multiple = TRUE),
+            textInput(inputId = 'cardTextChoice',
+                      label = 'Find Cards with Text:',
+                      value = '',
+                      placeholder = "Charrrrrge"),
             
-            submitButton(text = "Apply Changes")
+            submitButton(text = "Apply Changes"),
+            
+            hr(),
+            
+            includeMarkdown('appInfo.md')
             
         ),
         
@@ -131,7 +137,7 @@ ui <- fluidPage(
         mainPanel(
             
             DT::dataTableOutput("decksOutput")
-            
+           
         )
     )
 )
@@ -139,36 +145,54 @@ ui <- fluidPage(
 # Define server logic required to draw a histogram
 server <- function(input, output) {
     
+    plotData <- reactive({
+        
+        if(is.null(input$cardChoice)){
+            
+            appData %>%
+                filter(str_detect(str_to_upper(title), str_to_upper(input$titleChoice)),
+                       #name %in% input$cardChoice,
+                       deckClass %in% input$classChoice,
+                       channel_title %in% input$creatorChoice,
+                       race %in% input$tribeChoice,
+                       spellSchool %in% input$spellSchoolChoice,
+                       str_detect(str_to_upper(text), str_to_upper(input$cardTextChoice)))
+            
+        } else {
+            
+            appData %>%
+                filter(str_detect(str_to_upper(title), str_to_upper(input$titleChoice)),
+                       name %in% input$cardChoice,
+                       deckClass %in% input$classChoice,
+                       channel_title %in% input$creatorChoice,
+                       race %in% input$tribeChoice,
+                       spellSchool %in% input$spellSchoolChoice,
+                       str_detect(str_to_upper(text), str_to_upper(input$cardTextChoice)))
+            
+        }
+        
+    })
+    
     output$decksOutput <- DT::renderDataTable({
         
-        appData %>%
-            mutate(Deck = glue('<a href="https://playhearthstone.com/en-us/deckbuilder?deckcode={deckCode}">link</a>'),
-                   Youtube = glue('<a href="{url}">link</a>'),
-                   Published = lubridate::as_date(publication_date)) %>%
-            filter(str_detect(str_to_upper(title), str_to_upper(input$titleChoice)),
-                   str_detect(str_to_upper(name), str_to_upper(input$cardChoice)),
-                   !str_detect(str_to_upper(name), str_to_upper(input$notCardChoice)),
-                   deckClass %in% input$classChoice,
-                   channel_title %in% input$creatorChoice,
-                   race %in% input$tribeChoice,
-                   spellSchool %in% input$spellSchoolChoice,
-                   mechanics %in% input$mechanicChoice
-            ) %>%
-            arrange(desc(Published)) %>%
+        plotData() %>%
             select(Creator = channel_title,
                    Published,
                    Video = title,
+                   Class = deckClass,
                    Youtube,
                    Deck,
+                   HSReplay,
                    Code = deckCode) %>%
             distinct() %>%
+            arrange(desc(Published)) %>%
             datatable(escape = FALSE,
                       rownames = FALSE,
                       options = list(
                           pageLength = 25,
                           dom = 'tpl',
                           columnDefs = list(
-                              list(targets = 5,
+                              list(targets = 7,
                                    render = JS(
                                        "function(data, type, row, meta) {",
                                        "return type === 'display' && data.length > 6 ?",
@@ -180,7 +204,7 @@ server <- function(input, output) {
                       callback = JS('table.page(3).draw(false);'))
         
     })
-}
 
+}
 # Run the application 
 shinyApp(ui = ui, server = server)
