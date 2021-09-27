@@ -7,13 +7,9 @@ use_condaenv('hearthstoneDB',
              required = TRUE)
 hs <- import('hearthstone')
 
-creatorLookup <- read_csv('hsStreamerDB/data/creatorLookup.csv')
+creatorLookup <- read_csv('~/RProjects/hsDecklistScraper/hsStreamerDB/data/creatorLookup.csv')
 
-n <- 5 # Iterate over this to extract backfills.
-creator <- creatorLookup[n, 1]$Creator
-channelId <- creatorLookup[n, 2]$channelID
-creator
-channelId
+lookBackDays <- 7
 
 yt_oauth(clientID, secret)
 
@@ -23,7 +19,7 @@ recentVideos <- NULL
 for(i in 1:nrow(creatorLookup)){
   
   recentChannelData <- yt_search(term = "", 
-                                 published_after = format(lubridate::as_datetime(Sys.time() - 86400), 
+                                 published_after = format(lubridate::as_datetime(Sys.time() - lookBackDays*86400), 
                                                           "%Y-%m-%dT%H:%M:%SZ"),
                                  channel_id = creatorLookup$channelID[i],
                                  simplify = FALSE) %>%
@@ -33,8 +29,6 @@ for(i in 1:nrow(creatorLookup)){
   recentVideos <- c(recentVideos, recentChannelData)
   
 }
-recentVideos
-
 
 # Replicate functionality 
 channelVideosDailyAll <- NULL
@@ -48,13 +42,13 @@ for(i in recentVideos){
                           description = videoData$items[[1]]$snippet$description,
                           channel_id = videoData$items[[1]]$snippet$channelId,
                           channel_title = videoData$items[[1]]$snippet$channelTitle,
-                          url = glue('https://www.youtube.com/watch?v={i}'))
+                          url = glue('https://www.youtube.com/watch?v={i}'),
+                          run_date = Sys.Date())
   
   channelVideosDailyAll <- bind_rows(channelVideosDailyAll,
                                      videoMetaData)
   
 }
-channelVideosDailyAll
 
 # Find all of the initial deck-string patterns
 # Remove characters prior to deck codes, then extract all chars from start to first non-alphanumeric. 
@@ -71,10 +65,11 @@ for(i in 1:nrow(channelVideosDailyAll)){
   id <- channelVideosDailyAll$id[i]
   
   deckCodesDailyAll <- bind_rows(deckCodesDailyAll,
-                                 tibble(deckCode, id))
+                                 tibble(deckCode, 
+                                        id,
+                                        run_date = Sys.Date()))
   
 }
-deckCodesDailyAll
 
 # Parse deckcodes.
 decksDailyAll <- NULL
@@ -103,22 +98,44 @@ for(i in 1:nrow(deckCodesDailyAll)){
            id = id,
            hero = hero,
            format = format,
-           deckCode = deckCode)
+           deckCode = deckCode,
+           run_date = Sys.Date())
   
   decksDailyAll = bind_rows(decksDailyAll, deckData)
   
 }
-decksDailyAll
 
-View(channelVideosDailyAll)
-View(deckCodesDailyAll)
-View(decksDailyAll)
+# View(channelVideosDailyAll)
+# View(deckCodesDailyAll)
+# View(decksDailyAll)
 
-write_csv(channelVideosDailyAll, glue('hsStreamerdb/data/channelVideos_{runDate}.csv', 
-                                      runDate = Sys.Date()))
-write_csv(deckCodesDailyAll, glue('hsStreamerdb/data/deckCodes_{runDate}.csv', 
-                                  runDate = Sys.Date()))
-write_csv(decksDailyAll, glue('hsStreamerdb/data/decks_{runDate}.csv', 
-                              runDate = Sys.Date()))
+# write_csv(channelVideosDailyAll, glue('hsStreamerdb/data/channelVideos_{runDate}.csv', 
+#                                       runDate = Sys.Date()))
+# write_csv(deckCodesDailyAll, glue('hsStreamerdb/data/deckCodes_{runDate}.csv', 
+#                                   runDate = Sys.Date()))
+# write_csv(decksDailyAll, glue('hsStreamerdb/data/decks_{runDate}.csv', 
+#                               runDate = Sys.Date()))
+# 
 
+#Write results to local sqlite DB
+library(RSQLite)
+library(DBI)
+con <- dbConnect(SQLite(), 
+                 dbname = "hearthstoneDB.db")
 
+dbWriteTable(con, 
+             'channelVideosDaily', 
+             channelVideosDailyAll,
+             append = TRUE)
+
+dbWriteTable(con, 
+             'deckCodesDaily', 
+             deckCodesDailyAll,
+             append = TRUE)
+
+dbWriteTable(con, 
+             'decksDaily', 
+             decksDailyAll,
+             append = TRUE)
+
+dbDisconnect(con)
