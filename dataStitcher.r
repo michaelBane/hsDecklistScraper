@@ -46,7 +46,7 @@ decksAll
 #Collect and unnest HS data.
 # Import HS Data
 apiURL <- 'https://api.hearthstonejson.com/v1/91456/enUS/cards.collectible.json'
-hsCardDataUnnested <- fromJSON(apiURL) %>% 
+hsCardDataUnnested <- jsonlite::fromJSON(apiURL) %>% 
   tibble() %>%
   unnest_longer(mechanics) %>%
   select(-referencedTags, -classes)
@@ -56,3 +56,5 @@ write_csv(channelVideosAll, 'hsStreamerDB/data/channelVideos_All.csv')
 write_csv(deckCodesAll, 'hsStreamerDB/data/deckCodes_All.csv')
 write_csv(decksAll, 'hsStreamerDB/data/decks_All.csv')
 write_csv(hsCardDataUnnested, 'hsStreamerDB/data/hsCardDataUnnested.csv')
+
+

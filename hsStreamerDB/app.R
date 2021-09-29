@@ -11,9 +11,13 @@ library(tidyverse)
 library(DT)
 library(glue)
 library(markdown)
+library(DBI)
+library(RSQLite)
+
+setwd('~/RProjects/hsDecklistScraper/')
 
 # Import HS Data
-hsCardData <- read_csv('data/hsCardDataUnnested.csv',
+hsCardData <- read_csv('hsStreamerDB/data/hsCardDataUnnested.csv',
                        col_types = cols(
                            artist = col_character(),
                            cardClass = col_character(),
@@ -49,21 +53,26 @@ hsCardData <- read_csv('data/hsCardDataUnnested.csv',
                            battlegroundsDarkmoonPrizeTurn = col_logical(),
                            questReward = col_character()))
 
-data1 <- read_csv('data/channelVideos_All.csv')
-# data2 <- read_csv('data/deckCodes.csv')
-data3 <- read_csv('data/decks_All.csv') %>%
+con <- dbConnect(SQLite(), 
+                 dbname = "hearthstoneDB.db")
+
+data1 <- dbGetQuery(con, 'select * from channelvideos')
+
+data3 <- dbGetQuery(con, 'select * from decks') %>%
     inner_join(hsCardData, by = 'dbfId') %>%
     inner_join(select(hsCardData, dbfId, deckClass = cardClass), by = c('hero' = 'dbfId')) %>%
     mutate(race = coalesce(race, 'NONE'),
            spellSchool = coalesce(spellSchool, 'NONE'),
            mechanics = coalesce(mechanics, 'NONE'))
 
+dbDisconnect(con)
+
 appData <- inner_join(data1, 
                       data3,
                       by = c('id' = 'id.x')) %>%
-    mutate(Deck = glue('<a href="https://playhearthstone.com/en-us/deckbuilder?deckcode={deckCode}">link</a>'),
-           Youtube = glue('<a href="{url}">link</a>'),
-           HSReplay= glue('<a href="https://hsreplay.net/decks/{deckCode}">link</a>'),
+    mutate(Deck = glue('<a href="https://playhearthstone.com/en-us/deckbuilder?deckcode={deckCode}" target="_blank" rel="noopener noreferrer">link</a>'),
+           Youtube = glue('<a href="{url}" target="_blank" rel="noopener noreferrer">link</a>'),
+           HSReplay= glue('<a href="https://hsreplay.net/decks/{deckCode}" target="_blank" rel="noopener noreferrer">link</a>'),
            Published = lubridate::as_date(publication_date))
 
 classes <- sort(unique(data3$deckClass))
@@ -129,7 +138,7 @@ ui <- fluidPage(
             
             hr(),
             
-            includeMarkdown('appInfo.md')
+            includeMarkdown('hsStreamerDB/appInfo.md')
             
         ),
         

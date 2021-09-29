@@ -6,8 +6,9 @@ library(glue)
 use_condaenv('hearthstoneDB',
              required = TRUE)
 hs <- import('hearthstone')
+setwd('~/RProjects/hsDecklistScraper/')
 
-creatorLookup <- read_csv('~/RProjects/hsDecklistScraper/hsStreamerDB/data/creatorLookup.csv')
+creatorLookup <- read_csv('hsStreamerDB/data/creatorLookup.csv')
 
 lookBackDays <- 7
 
@@ -109,13 +110,13 @@ for(i in 1:nrow(deckCodesDailyAll)){
 # View(deckCodesDailyAll)
 # View(decksDailyAll)
 
-# write_csv(channelVideosDailyAll, glue('hsStreamerdb/data/channelVideos_{runDate}.csv', 
-#                                       runDate = Sys.Date()))
-# write_csv(deckCodesDailyAll, glue('hsStreamerdb/data/deckCodes_{runDate}.csv', 
+# write_csv(channelVideosDailyAll, 
+#           glue('hsStreamerdb/data/channelVideos_{runDate}.csv',
+#                runDate = Sys.Date()))
+# write_csv(deckCodesDailyAll, glue('hsStreamerdb/data/deckCodes_{runDate}.csv',
 #                                   runDate = Sys.Date()))
-# write_csv(decksDailyAll, glue('hsStreamerdb/data/decks_{runDate}.csv', 
+# write_csv(decksDailyAll, glue('hsStreamerdb/data/decks_{runDate}.csv',
 #                               runDate = Sys.Date()))
-# 
 
 #Write results to local sqlite DB
 library(RSQLite)
