@@ -2,19 +2,29 @@ library(tidyverse)
 
 # List of files to stitch
 channelVideosFiles <- list.files(path = 'hsStreamerDB/data/',
-                                 pattern = 'channelVideos_')
+                                 pattern = 'channelVideosBacklog_')
 
 deckCodesFiles <- list.files(path = 'hsStreamerDB/data/',
-                             pattern = 'deckCodes_')
+                             pattern = 'deckCodesBacklog_')
 
 decksFiles <- list.files(path = 'hsStreamerDB/data/',
-                         pattern = 'decks_')
+                         pattern = 'decksBacklog_')
 
 # Stitch channel video metadata
 channelVideosAll <- NULL
 for(i in channelVideosFiles){
   
-  channelData <- read_csv(glue('hsStreamerDB/data/{i}'))
+  channelData <- read_csv(glue('hsStreamerDB/data/{i}'),
+                          col_types = cols(
+                            id = col_character(),
+                            title = col_character(),
+                            publication_date = col_character(),
+                            description = col_character(),
+                            channel_id = col_character(),
+                            channel_title = col_character(),
+                            url = col_character(),
+                            run_date = col_date(format = "")
+                          ))
   
   channelVideosAll <- bind_rows(channelVideosAll, channelData)
   
@@ -52,9 +62,26 @@ hsCardDataUnnested <- jsonlite::fromJSON(apiURL) %>%
   select(-referencedTags, -classes)
 
 
-write_csv(channelVideosAll, 'hsStreamerDB/data/channelVideos_All.csv')
-write_csv(deckCodesAll, 'hsStreamerDB/data/deckCodes_All.csv')
-write_csv(decksAll, 'hsStreamerDB/data/decks_All.csv')
-write_csv(hsCardDataUnnested, 'hsStreamerDB/data/hsCardDataUnnested.csv')
+# write_csv(channelVideosAll, 'hsStreamerDB/data/channelVideos_All.csv')
+# write_csv(deckCodesAll, 'hsStreamerDB/data/deckCodes_All.csv')
+# write_csv(decksAll, 'hsStreamerDB/data/decks_All.csv')
+# write_csv(hsCardDataUnnested, 'hsStreamerDB/data/hsCardDataUnnested.csv')
 
+library(RSQLite)
+library(DBI)
+con <- dbConnect(SQLite(),
+                 dbname = "hsStreamerDB/hearthstoneDB.db")
 
+dbWriteTable(con,
+             'channelVideosBacklog',
+             channelVideosAll)
+
+dbWriteTable(con,
+             'deckCodesBacklog',
+             deckCodesAll)
+
+dbWriteTable(con,
+             'decksBacklog',
+             decksAll)
+
+dbDisconnect(con)

@@ -14,10 +14,10 @@ library(markdown)
 library(DBI)
 library(RSQLite)
 
-setwd('~/RProjects/hsDecklistScraper/')
+#setwd('~/RProjects/hsDecklistScraper/hsStreamerDB/')
 
 # Import HS Data
-hsCardData <- read_csv('hsStreamerDB/data/hsCardDataUnnested.csv',
+hsCardData <- read_csv('data/hsCardDataUnnested.csv',
                        col_types = cols(
                            artist = col_character(),
                            cardClass = col_character(),
@@ -56,7 +56,7 @@ hsCardData <- read_csv('hsStreamerDB/data/hsCardDataUnnested.csv',
 con <- dbConnect(SQLite(), 
                  dbname = "hearthstoneDB.db")
 
-data1 <- dbGetQuery(con, 'select * from channelvideos')
+data1 <- dbGetQuery(con, 'select * from channelvideos') %>% tibble()
 
 data3 <- dbGetQuery(con, 'select * from decks') %>%
     inner_join(hsCardData, by = 'dbfId') %>%
@@ -70,9 +70,10 @@ dbDisconnect(con)
 appData <- inner_join(data1, 
                       data3,
                       by = c('id' = 'id.x')) %>%
-    mutate(Deck = glue('<a href="https://playhearthstone.com/en-us/deckbuilder?deckcode={deckCode}" target="_blank" rel="noopener noreferrer">link</a>'),
-           Youtube = glue('<a href="{url}" target="_blank" rel="noopener noreferrer">link</a>'),
-           HSReplay= glue('<a href="https://hsreplay.net/decks/{deckCode}" target="_blank" rel="noopener noreferrer">link</a>'),
+    mutate(Cards = glue('<a href="https://playhearthstone.com/en-us/deckbuilder?deckcode={deckCode}" target="_blank" rel="noopener noreferrer">link</a>'),
+           Video = glue('<a href="{url}" target="_blank" rel="noopener noreferrer">link</a>'),
+           Stats = glue('<a href="https://hsreplay.net/decks/{deckCode}" target="_blank" rel="noopener noreferrer">link</a>'),
+           Creator = glue('<a href="https://www.youtube.com/channel/{channel_id}" target="_blank" rel="noopener noreferrer">{channel_title}</a>'),
            Published = lubridate::as_date(publication_date))
 
 classes <- sort(unique(data3$deckClass))
@@ -91,7 +92,7 @@ ui <- fluidPage(
     
     # Sidebar with a slider input for number of bins 
     sidebarLayout(
-        sidebarPanel(
+        sidebarPanel(width = 3,
             
             selectInput(inputId = 'creatorChoice',
                         label = 'Include Creators:',
@@ -138,7 +139,7 @@ ui <- fluidPage(
             
             hr(),
             
-            includeMarkdown('hsStreamerDB/appInfo.md')
+            includeMarkdown('appInfo.md')
             
         ),
         
@@ -185,13 +186,13 @@ server <- function(input, output) {
     output$decksOutput <- DT::renderDataTable({
         
         plotData() %>%
-            select(Creator = channel_title,
+            select(Creator,
                    Published,
-                   Video = title,
+                   Title = title,
                    Class = deckClass,
-                   Youtube,
-                   Deck,
-                   HSReplay,
+                   Video,
+                   Cards,
+                   Stats,
                    Code = deckCode) %>%
             distinct() %>%
             arrange(desc(Published)) %>%
@@ -201,11 +202,11 @@ server <- function(input, output) {
                           pageLength = 25,
                           dom = 'tpl',
                           columnDefs = list(
-                              list(targets = 7,
+                              list(targets = 2,
                                    render = JS(
                                        "function(data, type, row, meta) {",
-                                       "return type === 'display' && data.length > 6 ?",
-                                       "'<span title=\"' + data + '\">' + data.substr(0, 6) + '...</span>' : data;",
+                                       "return type === 'display' && data.length > 15 ?",
+                                       "'<span title=\"' + data + '\">' + data.substr(0, 15) + '...</span>' : data;",
                                        "}")
                               )
                           )

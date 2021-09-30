@@ -106,23 +106,15 @@ for(i in 1:nrow(deckCodesDailyAll)){
   
 }
 
-# View(channelVideosDailyAll)
-# View(deckCodesDailyAll)
-# View(decksDailyAll)
-
-# write_csv(channelVideosDailyAll, 
-#           glue('hsStreamerdb/data/channelVideos_{runDate}.csv',
-#                runDate = Sys.Date()))
-# write_csv(deckCodesDailyAll, glue('hsStreamerdb/data/deckCodes_{runDate}.csv',
-#                                   runDate = Sys.Date()))
-# write_csv(decksDailyAll, glue('hsStreamerdb/data/decks_{runDate}.csv',
-#                               runDate = Sys.Date()))
+# channelVideosDailyAll %>% View()
+# deckCodesDailyAll
+# decksDailyAll
 
 #Write results to local sqlite DB
 library(RSQLite)
 library(DBI)
 con <- dbConnect(SQLite(), 
-                 dbname = "hearthstoneDB.db")
+                 dbname = "hsStreamerDB/hearthstoneDB.db")
 
 dbWriteTable(con, 
              'channelVideosDaily', 
@@ -140,3 +132,7 @@ dbWriteTable(con,
              append = TRUE)
 
 dbDisconnect(con)
+
+# Update App bundle.
+rsconnect::deployApp(appDir = 'hsStreamerDB',
+                     forceUpdate = TRUE)

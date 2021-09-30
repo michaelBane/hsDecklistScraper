@@ -1,6 +1,6 @@
 **Welcome to the deck database**
 
-This app is currently in pure prototype phase and is not intended to scale. Currently I have about a weeks work invested in this project so expect jankiness 😉.
+This app is currently in pure prototype phase and is not intended to scale. Currently I have about 2 weeks work invested in this project so expect jankiness 😉.
 
 **Why does this exists?**
 

@@ -9,25 +9,23 @@ hs <- import('hearthstone')
 # Manually curate channel ids
 creatorLookup <- read_csv('hsStreamerDB/data/creatorLookup.csv')
 
-n <- 1 # Iterate over this to extract backfills.
+n <- 6 # Manually iterate over this to extract backfills.
 creator <- creatorLookup[n, 1]$Creator
 channelId <- creatorLookup[n, 2]$channelID
 creator
 channelId
 
-# Import YT Data.
-# Authenticate
-# clientID <- '573231105362-p1mtfdnavthjtoq84nivib1scob8ph0n.apps.googleusercontent.com'
-# secret <- rstudioapi::askForPassword() 
-
+#clientID <- '573231105362-p1mtfdnavthjtoq84nivib1scob8ph0n.apps.googleusercontent.com'
+#secret <- rstudioapi::askForPassword() # Zs1XgYb-euX9I_FY9BA6BvJO
 yt_oauth(clientID, secret)
 
-channelVideos <- get_all_channel_video_stats(channel_id = channelId) #approx 2 mins
+channelVideos <- get_all_channel_video_stats(channel_id = channelId) %>%
+  select(id, title, publication_date, description, channel_id, channel_title, url) %>%
+  mutate(run_date = Sys.Date())
 
 # Find all of the initial deck-string patterns
 # Remove characters prior to deck codes, then extract all chars from start to first non-alphanumeric. 
 # regex: https://www.geeksforgeeks.org/python-program-to-extract-string-till-first-non-alphanumeric-character/
-
 deckCodes <- NULL
 for(i in 1:nrow(channelVideos)){
   
@@ -36,17 +34,16 @@ for(i in 1:nrow(channelVideos)){
     str_extract("[\\dA-Za-z\\w+\\w/\\w=]*") %>%
     unique()
   
-  id <- channelVideos$id[i]
-  
   deckCodes <- bind_rows(deckCodes,
-                         tibble(deckCode, id))
+                         tibble(deckCode, 
+                                id = channelVideos$id[i],
+                                run_date = Sys.Date()))
   
 }
-deckCodes
 
 # Parse deckcodes.
 decks <- NULL
-for(i in 1:nrow(deckCodes)){
+for(i in 365:nrow(deckCodes)){
   
   parsedDecklist <- hs$deckstrings$parse_deckstring(deckCodes$deckCode[i])
   
@@ -71,7 +68,8 @@ for(i in 1:nrow(deckCodes)){
            id = id,
            hero = hero,
            format = format,
-           deckCode = deckCode)
+           deckCode = deckCode,
+           run_date = Sys.Date())
   
   decks = bind_rows(decks, deckData)
 
@@ -81,9 +79,9 @@ View(channelVideos)
 View(deckCodes)
 View(decks)
 
-write_csv(channelVideos, glue::glue('hsStreamerdb/data/channelVideos_{creator}.csv'))
-write_csv(deckCodes, glue::glue('hsStreamerdb/data/deckCodes_{creator}.csv'))
-write_csv(decks, glue::glue('hsStreamerdb/data/decks_{creator}.csv'))
+write_csv(channelVideos, glue::glue('hsStreamerdb/data/channelVideosBacklog_{creator}.csv'))
+write_csv(deckCodes, glue::glue('hsStreamerdb/data/deckCodesBacklog_{creator}.csv'))
+write_csv(decks, glue::glue('hsStreamerdb/data/decksBacklog_{creator}.csv'))
 
 
 
