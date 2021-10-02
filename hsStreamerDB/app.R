@@ -84,7 +84,9 @@ cards <- sort(unique(data3$name))
 #mechanics <- sort(unique(data3$mechanics))
 
 # Define UI for application that draws a histogram
-ui <- fluidPage(
+ui <- function(request){
+    
+    fluidPage(
     
     # Application title
     titlePanel("HS Streamer DeckDB: Find something to play!",
@@ -137,6 +139,8 @@ ui <- fluidPage(
             
             submitButton(text = "Apply Changes"),
             
+            #bookmarkButton(),
+            
             hr(),
             
             includeMarkdown('appInfo.md')
@@ -146,14 +150,16 @@ ui <- fluidPage(
         # Show a plot of the generated distribution
         mainPanel(
             
-            DT::dataTableOutput("decksOutput")
+            dataTableOutput("decksOutput")
            
         )
     )
 )
+    
+}
 
 # Define server logic required to draw a histogram
-server <- function(input, output) {
+server <- function(input, output, session) {
     
     plotData <- reactive({
         
@@ -196,7 +202,8 @@ server <- function(input, output) {
                    Code = deckCode) %>%
             distinct() %>%
             arrange(desc(Published)) %>%
-            datatable(escape = FALSE,
+            datatable(selection = 'none',
+                      escape = FALSE,
                       rownames = FALSE,
                       options = list(
                           pageLength = 25,
@@ -217,4 +224,4 @@ server <- function(input, output) {
 
 }
 # Run the application 
-shinyApp(ui = ui, server = server)
+shinyApp(ui = ui, server = server, enableBookmarking = "url")
