@@ -7,154 +7,147 @@
 # http://shiny.rstudio.com
 
 library(shiny)
+library(bslib)
 library(tidyverse)
 library(DT)
 library(glue)
 library(markdown)
 library(DBI)
 library(RSQLite)
+library(ggplot2)
 
 #setwd('~/RProjects/hsDecklistScraper/hsStreamerDB/')
 
 # Import HS Data
 hsCardData <- read_csv('data/hsCardDataUnnested.csv',
-                       col_types = cols(
-                           artist = col_character(),
-                           cardClass = col_character(),
-                           collectible = col_logical(),
-                           cost = col_double(),
-                           dbfId = col_double(),
-                           flavor = col_character(),
-                           id = col_character(),
-                           name = col_character(),
-                           rarity = col_character(),
-                           set = col_character(),
-                           spellSchool = col_character(),
-                           text = col_character(),
-                           type = col_character(),
-                           mechanics = col_character(),
-                           attack = col_double(),
-                           health = col_double(),
-                           race = col_character(),
-                           elite = col_logical(),
-                           targetingArrowText = col_character(),
-                           durability = col_double(),
-                           overload = col_double(),
-                           spellDamage = col_double(),
-                           battlegroundsPremiumDbfId = col_double(),
-                           howToEarnGolden = col_character(),
-                           howToEarn = col_character(),
-                           collectionText = col_character(),
-                           armor = col_double(),
-                           techLevel = col_double(),
-                           faction = col_character(),
-                           multiClassGroup = col_character(),
-                           hideStats = col_logical(),
-                           battlegroundsDarkmoonPrizeTurn = col_logical(),
-                           questReward = col_character()))
+                       col_types = '_c__d__c___________________________') %>%
+    distinct()
 
 con <- dbConnect(SQLite(), 
                  dbname = "hearthstoneDB.db")
 
-data1 <- dbGetQuery(con, 'select * from channelvideos') %>% tibble()
+channelVideos <- dbGetQuery(con, 'select id, title, publication_date, channel_id, channel_title, url from channelvideos') %>% 
+    tibble()
 
-data3 <- dbGetQuery(con, 'select * from decks') %>%
-    inner_join(hsCardData, by = 'dbfId') %>%
-    inner_join(select(hsCardData, dbfId, deckClass = cardClass), by = c('hero' = 'dbfId')) %>%
-    mutate(race = coalesce(race, 'NONE'),
-           spellSchool = coalesce(spellSchool, 'NONE'),
-           mechanics = coalesce(mechanics, 'NONE'))
+decksWithCardMetaData <- dbGetQuery(con, 'select dbfId, id, hero, deckCode from decks') %>%
+    inner_join(hsCardData, by = 'dbfId') %>% # join metadata.
+    inner_join(select(hsCardData, dbfId, deckClass = cardClass), 
+               by = c('hero' = 'dbfId')) %>%
+    select(-cardClass) %>%
+    tibble() # join hero class.
 
 dbDisconnect(con)
 
-appData <- inner_join(data1, 
-                      data3,
-                      by = c('id' = 'id.x')) %>%
+# Main processing on pulled data.
+appData <- inner_join(channelVideos, 
+                      decksWithCardMetaData,
+                      by = 'id') %>%
     mutate(Cards = glue('<a href="https://playhearthstone.com/en-us/deckbuilder?deckcode={deckCode}" target="_blank" rel="noopener noreferrer">link</a>'),
            Video = glue('<a href="{url}" target="_blank" rel="noopener noreferrer">link</a>'),
            Stats = glue('<a href="https://hsreplay.net/decks/{deckCode}" target="_blank" rel="noopener noreferrer">link</a>'),
            Creator = glue('<a href="https://www.youtube.com/channel/{channel_id}" target="_blank" rel="noopener noreferrer">{channel_title}</a>'),
-           Published = lubridate::as_date(publication_date))
+           Published = lubridate::as_date(publication_date)) %>%
+    chop(cols = c(name, dbfId))
 
-classes <- sort(unique(data3$deckClass))
-creators <- sort(unique(data1$channel_title))
-tribes <- sort(unique(data3$race))
-spellSchools <- sort(unique(data3$spellSchool))
-cards <- sort(unique(data3$name))
-#mechanics <- sort(unique(data3$mechanics))
+# Vectors for populating selectors.
+classes <- sort(unique(decksWithCardMetaData$deckClass))
+creators <- sort(unique(channelVideos$channel_title))
+cards <- sort(unique(decksWithCardMetaData$name))
+maxDate <- max(appData$Published, na.rm = TRUE)
+minDate <- min(appData$Published, na.rm = TRUE)
 
-# Define UI for application that draws a histogram
+# For matching color to class in images.
+hsPalleteMatch <- tibble(colour = c('#A330C9', '#FF7D0A', '#ABD473', '#69CCF0', '#F58CBA', '#000000', '#FFF569', '#0070DE', '#9482C9', '#C79C6E'),
+                         deckClass = classes)
+
 ui <- function(request){
     
     fluidPage(
-    
-    # Application title
-    titlePanel("HS Streamer DeckDB: Find something to play!",
-               windowTitle = 'hsDeckDB'),
-    
-    # Sidebar with a slider input for number of bins 
-    sidebarLayout(
-        sidebarPanel(width = 3,
-            
-            selectInput(inputId = 'creatorChoice',
-                        label = 'Include Creators:',
-                        choices = creators,
-                        selected = creators,
-                        multiple = TRUE),
-            
-            textInput(inputId = 'titleChoice',
-                      label = 'Search Title:',
-                      value = '',
-                      placeholder = 'Sluzzle699'),
-            
-            selectInput(inputId = 'classChoice',
-                        label = 'Include Deck Classes:',
-                        choices = classes,
-                        selected = classes,
-                        multiple = TRUE),
-            
-            selectInput(inputId = 'cardChoice',
-                        label = 'Find Cards:',
-                        choices = cards,
-                        multiple = TRUE),
-            
-            helpText('Multiple inputs return decks with either card, not both'),
-            
-            selectInput(inputId = 'tribeChoice',
-                        label = 'Deck Contains Tribes:',
-                        choices = tribes,
-                        selected = tribes,
-                        multiple = TRUE),
-            
-            selectInput(inputId = 'spellSchoolChoice',
-                        label = 'Deck Contains Spell Schools:',
-                        choices = spellSchools,
-                        selected = spellSchools,
-                        multiple = TRUE),
-            
-            textInput(inputId = 'cardTextChoice',
-                      label = 'Find Cards with Text:',
-                      value = '',
-                      placeholder = "Charrrrrge"),
-            
-            submitButton(text = "Apply Changes"),
-            
-            #bookmarkButton(),
-            
-            hr(),
-            
-            includeMarkdown('appInfo.md')
-            
+        
+        theme = bs_theme(bootswatch = "united"),
+        
+        navbarPage("HS Streamer DeckDB: Find something to play!",
+                   windowTitle = 'hsDeckDB',
+                   tabPanel("Decks",
+                            
+                            sidebarLayout(
+                                
+                                sidebarPanel(width = 3,
+                                             
+                                             selectInput(inputId = 'creatorChoice',
+                                                         label = 'Include Creators:',
+                                                         choices = creators,
+                                                         selected = creators,
+                                                         multiple = TRUE),
+                                             
+                                             textInput(inputId = 'titleChoice',
+                                                       label = 'Search Title:',
+                                                       value = '',
+                                                       placeholder = 'Sluzzle699'),
+                                             
+                                             selectInput(inputId = 'classChoice',
+                                                         label = 'Include Deck Classes:',
+                                                         choices = classes,
+                                                         selected = classes,
+                                                         multiple = TRUE),
+                                             
+                                             selectInput(inputId = 'cardChoice',
+                                                         label = 'Find Cards:',
+                                                         choices = cards,
+                                                         multiple = TRUE),
+                                             
+                                             helpText('Multiple inputs return decks with either card, not both'),
+                                             
+                                             dateRangeInput(inputId = 'dateChoice',
+                                                            label = 'Publish Date Range',
+                                                            start = minDate,
+                                                            end = maxDate,
+                                                            min = minDate,
+                                                            max = maxDate),
+                                             
+                                             submitButton(text = "Apply Changes"),
+                                             
+                                             hr(),
+                                             
+                                             includeMarkdown('appInfo.md')
+                                             
+                                ),
+                                
+                                # Show a plot of the generated distribution
+                                mainPanel(
+                                    
+                                    tabsetPanel(
+                                        
+                                        tabPanel('Catalogue',
+                                                 dataTableOutput("decksOutput")),
+                                        
+                                        tabPanel('Summaries',
+                                                 #plotOutput('timelineOutput'),
+                                                 br(),
+                                                 plotOutput('commonCardsOutput'),
+                                                 br(),
+                                                 plotOutput('timelineOutput'),
+                                                 br(),
+                                                 plotOutput('classDistOutput'),
+                                                 br(),
+                                                 plotOutput('creatorDistOutput'),
+                                                 br(),
+                                                 'More coming soon'
+                                                 )
+                                        
+                                    )
+                                )
+                            )
+                            
+                   ),
+
+                  tabPanel("Podcast",
+                          "Coming Soon")
         ),
         
-        # Show a plot of the generated distribution
-        mainPanel(
-            
-            dataTableOutput("decksOutput")
-           
-        )
+        # Sidebar with a slider input for number of bins 
+        
     )
-)
     
 }
 
@@ -167,23 +160,19 @@ server <- function(input, output, session) {
             
             appData %>%
                 filter(str_detect(str_to_upper(title), str_to_upper(input$titleChoice)),
-                       #name %in% input$cardChoice,
                        deckClass %in% input$classChoice,
                        channel_title %in% input$creatorChoice,
-                       race %in% input$tribeChoice,
-                       spellSchool %in% input$spellSchoolChoice,
-                       str_detect(str_to_upper(text), str_to_upper(input$cardTextChoice)))
+                       between(Published, input$dateChoice[1], input$dateChoice[2]))
             
         } else {
             
             appData %>%
+                mutate(containsCards = map_lgl(name, function(x) input$cardChoice %in% x)) %>%
                 filter(str_detect(str_to_upper(title), str_to_upper(input$titleChoice)),
-                       name %in% input$cardChoice,
                        deckClass %in% input$classChoice,
                        channel_title %in% input$creatorChoice,
-                       race %in% input$tribeChoice,
-                       spellSchool %in% input$spellSchoolChoice,
-                       str_detect(str_to_upper(text), str_to_upper(input$cardTextChoice)))
+                       between(Published, input$dateChoice[1], input$dateChoice[2]),
+                       containsCards)
             
         }
         
@@ -221,7 +210,123 @@ server <- function(input, output, session) {
                       callback = JS('table.page(3).draw(false);'))
         
     })
+    
+    output$timelineOutput <- renderPlot(
 
+        plotData() %>%
+            select(Creator = channel_title,
+                   Title = title,
+                   deckCode,
+                   Published) %>%
+            distinct() %>%
+            count(Published,
+                  name = 'Decks') %>%
+            ggplot(aes(x = Published,
+                       y = Decks)) +
+            geom_histogram(stat = 'identity',
+                           color = '#e95420') +
+            scale_y_continuous(minor_breaks = NULL) +
+            theme_bw() +
+            labs(title = 'Decks published by Date.' ,
+                 caption = 'Plot respects filters to the left.',
+                 y = '')
+
+    )
+    
+    output$commonCardsOutput <- renderPlot({
+        
+        plotData() %>%
+            select(Creator = channel_title,
+                   Title = title,
+                   deckCode,
+                   Card = name) %>%
+            distinct() %>%
+            unnest_longer(Card) %>%
+            count(Card,
+                  name = 'Decks',
+                  sort = TRUE) %>%
+            head(25) %>%
+            ggplot(aes(y = Decks,
+                       x = fct_reorder(Card, Decks))) +
+            geom_histogram(stat = 'identity',
+                           color = '#e95420') +
+            scale_y_continuous(minor_breaks = NULL) +
+            theme_bw() +
+            labs(title = '25 Most popular cards in decks selected.' ,
+                 caption = 'Plot respects filters to the left.',
+                 x = '') +
+            coord_flip()
+        
+    })
+    
+    output$classDistOutput <- renderPlot({
+        
+        palette <- hsPalleteMatch %>%
+            inner_join(distinct(plotData(), deckClass),
+                       by = "deckClass") %>%
+            pull(colour)
+        
+        plotData() %>%
+            select(Creator = channel_title,
+                   Title = title,
+                   deckCode,
+                   Class = deckClass) %>%
+            distinct() %>%
+            count(Class,
+                  name = 'Decks') %>%
+            ggplot(aes(y = Decks,
+                       x = fct_rev(Class),
+                       fill = Class)) +
+            geom_histogram(stat = 'identity') +
+            scale_y_continuous(minor_breaks = NULL) +
+            scale_fill_manual(values = palette,
+                              guide = "none") +
+            theme_bw() +
+            labs(title = 'Number of Decks by Class.',
+                 caption = 'Plot respects filters to the left.',
+                 x = '') +
+            coord_flip()
+        
+    })
+
+    output$creatorDistOutput <- renderPlot({
+        
+        plotData() %>%
+            select(Creator = channel_title,
+                   Title = title,
+                   deckCode) %>%
+            distinct() %>%
+            count(Creator,
+                  name = 'Decks') %>%
+            ggplot(aes(y = Decks,
+                       x = fct_reorder(Creator, Decks))) +
+            geom_histogram(stat = 'identity',
+                           color = '#e95420') +
+            scale_y_continuous(minor_breaks = NULL) +
+            scale_fill_manual(guide = "none") +
+            theme_bw() +
+            labs(title = 'Number of Decks by Creator.',
+                 caption = 'Plot respects filters to the left.',
+                 x = '') +
+            coord_flip()
+        
+    })
+    
 }
+
 # Run the application 
-shinyApp(ui = ui, server = server, enableBookmarking = "url")
+shinyApp(ui = ui, 
+         server = server, 
+         enableBookmarking = "url")
+
+
+
+
+
+
+
+
+
+
+
+

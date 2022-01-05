@@ -55,7 +55,7 @@ decksAll
 
 #Collect and unnest HS data.
 # Import HS Data
-apiURL <- 'https://api.hearthstonejson.com/v1/91456/enUS/cards.collectible.json'
+apiURL <- 'https://api.hearthstonejson.com/v1/128654/enUS/cards.collectible.json'
 hsCardDataUnnested <- jsonlite::fromJSON(apiURL) %>% 
   tibble() %>%
   unnest_longer(mechanics) %>%
