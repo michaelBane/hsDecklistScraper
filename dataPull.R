@@ -9,7 +9,7 @@ hs <- import('hearthstone')
 # Manually curate channel ids
 creatorLookup <- read_csv('hsStreamerDB/data/creatorLookup.csv')
 
-n <- 6 # Manually iterate over this to extract backfills.
+n <- 11 # Manually iterate over this to extract backfills.
 creator <- creatorLookup[n, 1]$Creator
 channelId <- creatorLookup[n, 2]$channelID
 creator
@@ -43,7 +43,7 @@ for(i in 1:nrow(channelVideos)){
 
 # Parse deckcodes.
 decks <- NULL
-for(i in 365:nrow(deckCodes)){
+for(i in 545:nrow(deckCodes)){
   
   parsedDecklist <- hs$deckstrings$parse_deckstring(deckCodes$deckCode[i])
   

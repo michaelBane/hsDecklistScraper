@@ -8,6 +8,10 @@ use_condaenv('hearthstoneDB',
 hs <- import('hearthstone')
 setwd('~/RProjects/hsDecklistScraper/')
 
+###################
+# Harvest Data
+###################
+
 creatorLookup <- read_csv('hsStreamerDB/data/creatorLookup.csv')
 
 lookBackDays <- 7
@@ -106,13 +110,10 @@ for(i in 1:nrow(deckCodesDailyAll)){
   
 }
 
-# channelVideosDailyAll %>% View()
-# deckCodesDailyAll
-# decksDailyAll
-
 #Write results to local sqlite DB
 library(RSQLite)
 library(DBI)
+
 con <- dbConnect(SQLite(), 
                  dbname = "hsStreamerDB/hearthstoneDB.db")
 
@@ -132,6 +133,19 @@ dbWriteTable(con,
              append = TRUE)
 
 dbDisconnect(con)
+
+# Card data
+apiURL <- 'https://api.hearthstonejson.com/v1/latest/enUS/cards.collectible.json'
+hsCardDataUnnested <- jsonlite::fromJSON(apiURL) %>% 
+  tibble() %>%
+  unnest_longer(mechanics) %>%
+  select(-referencedTags, -classes)
+
+write_csv(hsCardDataUnnested, 'hsStreamerDB/data/hsCardDataUnnested.csv')
+
+###################
+# Upload
+###################
 
 # Update App bundle.
 rsconnect::deployApp(appDir = 'hsStreamerDB',

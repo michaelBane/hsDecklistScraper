@@ -1,4 +1,5 @@
 library(tidyverse)
+library(glue)
 
 # List of files to stitch
 channelVideosFiles <- list.files(path = 'hsStreamerDB/data/',
@@ -55,7 +56,7 @@ decksAll
 
 #Collect and unnest HS data.
 # Import HS Data
-apiURL <- 'https://api.hearthstonejson.com/v1/128654/enUS/cards.collectible.json'
+apiURL <- 'https://api.hearthstonejson.com/v1/latest/enUS/cards.collectible.json'
 hsCardDataUnnested <- jsonlite::fromJSON(apiURL) %>% 
   tibble() %>%
   unnest_longer(mechanics) %>%
@@ -65,7 +66,7 @@ hsCardDataUnnested <- jsonlite::fromJSON(apiURL) %>%
 # write_csv(channelVideosAll, 'hsStreamerDB/data/channelVideos_All.csv')
 # write_csv(deckCodesAll, 'hsStreamerDB/data/deckCodes_All.csv')
 # write_csv(decksAll, 'hsStreamerDB/data/decks_All.csv')
-# write_csv(hsCardDataUnnested, 'hsStreamerDB/data/hsCardDataUnnested.csv')
+# write_csv(hsCardDataUnnested, 'data/hsCardDataUnnested.csv')
 
 library(RSQLite)
 library(DBI)
@@ -74,14 +75,17 @@ con <- dbConnect(SQLite(),
 
 dbWriteTable(con,
              'channelVideosBacklog',
-             channelVideosAll)
+             channelVideosAll,
+             append = TRUE)
 
 dbWriteTable(con,
              'deckCodesBacklog',
-             deckCodesAll)
+             deckCodesAll,
+             append = TRUE)
 
 dbWriteTable(con,
              'decksBacklog',
-             decksAll)
+             decksAll,
+             append = TRUE)
 
 dbDisconnect(con)

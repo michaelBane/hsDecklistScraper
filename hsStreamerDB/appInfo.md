@@ -14,4 +14,9 @@ This app is currently in pure prototype phase and is not intended to scale. Curr
 
 I used [tuber](https://github.com/soodoku/tuber) to access the YT API and [python-hearthstone](https://github.com/HearthSim/python-hearthstone) to parse deck-codes, with [tidyverse](https://www.tidyverse.org/packages/) and [reticulate](https://rstudio.github.io/reticulate/) pulling it all together. This app is built with [Shiny](https://shiny.rstudio.com/). You can find all the code on [Github](https://github.com/michaelBane/hsDecklistScraper).
 
-**I hope you like it! [Feedback is appreciated!](https://twitter.com/baney64)**
+**I hope you like it!**
+
+<p><a href="https://twitter.com/baney64">
+<img src="https://logos-download.com/wp-content/uploads/2016/02/Twitter_Logo_new-700x569.png" width="50">
+</a></p>
+

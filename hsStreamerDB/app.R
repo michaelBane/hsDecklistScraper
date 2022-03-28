@@ -1,11 +1,3 @@
-#
-# This is a Shiny web application. You can run the application by clicking
-# the 'Run App' button above.
-#
-# Find out more about building applications with Shiny here:
-#
-# http://shiny.rstudio.com
-
 library(shiny)
 library(bslib)
 library(tidyverse)
@@ -20,21 +12,28 @@ library(ggplot2)
 
 # Import HS Data
 hsCardData <- read_csv('data/hsCardDataUnnested.csv',
-                       col_types = '_c__d__c___________________________') %>%
+                       col_types = '_c__d_cc____________________________') %>%
+    rename(cardId = id) %>%
     distinct()
+
+hsCalendar <- read_csv('data/hsCalendar.csv')
 
 con <- dbConnect(SQLite(), 
                  dbname = "hearthstoneDB.db")
 
 channelVideos <- dbGetQuery(con, 'select id, title, publication_date, channel_id, channel_title, url from channelvideos') %>% 
+    mutate(channel_title = ifelse(channel_title == 'Martian Buu', 'MartianBuu', channel_title)) %>%
     tibble()
 
 decksWithCardMetaData <- dbGetQuery(con, 'select dbfId, id, hero, deckCode from decks') %>%
-    inner_join(hsCardData, by = 'dbfId') %>% # join metadata.
+    inner_join(hsCardData, 
+               by = 'dbfId') %>%
     inner_join(select(hsCardData, dbfId, deckClass = cardClass), 
                by = c('hero' = 'dbfId')) %>%
     select(-cardClass) %>%
     tibble() # join hero class.
+
+deckArchetypes <- dbGetQuery(con, 'select * from deckArchetypes')
 
 dbDisconnect(con)
 
@@ -42,15 +41,21 @@ dbDisconnect(con)
 appData <- inner_join(channelVideos, 
                       decksWithCardMetaData,
                       by = 'id') %>%
+    left_join(deckArchetypes,
+              by = 'deckCode') %>%
     mutate(Cards = glue('<a href="https://playhearthstone.com/en-us/deckbuilder?deckcode={deckCode}" target="_blank" rel="noopener noreferrer">link</a>'),
            Video = glue('<a href="{url}" target="_blank" rel="noopener noreferrer">link</a>'),
            Stats = glue('<a href="https://hsreplay.net/decks/{deckCode}" target="_blank" rel="noopener noreferrer">link</a>'),
            Creator = glue('<a href="https://www.youtube.com/channel/{channel_id}" target="_blank" rel="noopener noreferrer">{channel_title}</a>'),
            Published = lubridate::as_date(publication_date)) %>%
-    chop(cols = c(name, dbfId))
+    distinct() %>%
+    chop(cols = c(name, dbfId, cardId)) %>%
+    mutate(prettyDeck = map_chr(.x = cardId, 
+                                .f = function(x) paste(glue('<img style="border:1px solid white" width="50" height="50" src="https://art.hearthstonejson.com/v1/256x/{x}.jpg">'), collapse = '')))
 
 # Vectors for populating selectors.
 classes <- sort(unique(decksWithCardMetaData$deckClass))
+archetypes <- sort(unique(deckArchetypes$archetype))
 creators <- sort(unique(channelVideos$channel_title))
 cards <- sort(unique(decksWithCardMetaData$name))
 maxDate <- max(appData$Published, na.rm = TRUE)
@@ -66,13 +71,19 @@ ui <- function(request){
         
         theme = bs_theme(bootswatch = "united"),
         
-        navbarPage("HS Streamer DeckDB: Find something to play!",
-                   windowTitle = 'hsDeckDB',
+        navbarPage("The Wild Deck Database: Find something to play!",
+                   
+                   windowTitle = 'Wild Deck DB',
+                   
                    tabPanel("Decks",
                             
                             sidebarLayout(
                                 
                                 sidebarPanel(width = 3,
+                                             
+                                             textOutput('nOutput'),
+                                             
+                                             hr(),
                                              
                                              selectInput(inputId = 'creatorChoice',
                                                          label = 'Include Creators:',
@@ -90,13 +101,17 @@ ui <- function(request){
                                                          choices = classes,
                                                          selected = classes,
                                                          multiple = TRUE),
-                                             
+
+                                             # selectInput(inputId = 'archetypeChoice',
+                                             #             label = 'Include Archetypes:',
+                                             #             choices = archetypes,
+                                             #             selected = archetypes,
+                                             #             multiple = TRUE),
+                                                                                          
                                              selectInput(inputId = 'cardChoice',
-                                                         label = 'Find Cards:',
+                                                         label = 'Includes Cards:',
                                                          choices = cards,
                                                          multiple = TRUE),
-                                             
-                                             helpText('Multiple inputs return decks with either card, not both'),
                                              
                                              dateRangeInput(inputId = 'dateChoice',
                                                             label = 'Publish Date Range',
@@ -119,33 +134,58 @@ ui <- function(request){
                                     tabsetPanel(
                                         
                                         tabPanel('Catalogue',
-                                                 dataTableOutput("decksOutput")),
+                                                 
+                                                 dataTableOutput("decksOutput")
+                                                 
+                                        ),
                                         
                                         tabPanel('Summaries',
-                                                 #plotOutput('timelineOutput'),
                                                  br(),
+                                                 
                                                  plotOutput('commonCardsOutput'),
                                                  br(),
+                                                 
                                                  plotOutput('timelineOutput'),
                                                  br(),
+                                                 
                                                  plotOutput('classDistOutput'),
                                                  br(),
+                                                 
                                                  plotOutput('creatorDistOutput'),
                                                  br(),
+                                                 
                                                  'More coming soon'
-                                                 )
-                                        
+                                        )
                                     )
                                 )
                             )
-                            
                    ),
-
-                  tabPanel("Podcast",
-                          "Coming Soon")
+                   
+                   # tabPanel("Archetypes",
+                   #          
+                   #          tabsetPanel(
+                   #              
+                   #              tabPanel("Demon Hunter"),
+                   #              tabPanel("Druid"),
+                   #              tabPanel("Hunter"),
+                   #              tabPanel("Mage"),
+                   #              tabPanel("Paladin"),
+                   #              tabPanel("Priest"),
+                   #              tabPanel("Rogue"),
+                   #              tabPanel("Shaman"),
+                   #              tabPanel("Warlock"),
+                   #              tabPanel("Warrior")
+                   #              
+                   #          )
+                   #          
+                   # ),
+                   
+                   tabPanel("Podcast",
+                            
+                            HTML('<iframe title="Hearthramble" allowtransparency="true" height="480" width="100%" style="border: none; min-width: min(100%, 430px);" scrolling="no" data-name="pb-iframe-player" src="https://www.podbean.com/player-v2/?i=6gabm-cc326f-pbblog-playlist&share=1&download=1&rtl=0&fonts=Arial&skin=ff6d00&font-color=ffffff&order=episodic&limit=20&filter=all&ss=8be91c5e59024d6913c173651b74da5d&btn-skin=1b1b1b&size=480" allowfullscreen=""></iframe>')
+                            
+                   )
         ),
-        
-        # Sidebar with a slider input for number of bins 
         
     )
     
@@ -167,7 +207,7 @@ server <- function(input, output, session) {
         } else {
             
             appData %>%
-                mutate(containsCards = map_lgl(name, function(x) input$cardChoice %in% x)) %>%
+                mutate(containsCards = map_lgl(name, function(x) all(input$cardChoice %in% x))) %>%
                 filter(str_detect(str_to_upper(title), str_to_upper(input$titleChoice)),
                        deckClass %in% input$classChoice,
                        channel_title %in% input$creatorChoice,
@@ -178,9 +218,9 @@ server <- function(input, output, session) {
         
     })
     
-    output$decksOutput <- DT::renderDataTable({
+    output$nOutput <- renderText({
         
-        plotData() %>%
+        nDecks <- plotData() %>%
             select(Creator,
                    Published,
                    Title = title,
@@ -188,6 +228,28 @@ server <- function(input, output, session) {
                    Video,
                    Cards,
                    Stats,
+                   `Pretty Deck` = prettyDeck,
+                   Code = deckCode) %>%
+            distinct() %>%
+            count()
+        
+        glue('{nDecks} Decks.')
+        
+        
+    })
+    
+    output$decksOutput <- DT::renderDataTable({
+        
+        plotData() %>%
+            select(Creator,
+                   Published,
+                   Title = title,
+                   Class = deckClass,
+                   #archetype,
+                   Video,
+                   Cards,
+                   Stats,
+                   `Pretty Deck` = prettyDeck,
                    Code = deckCode) %>%
             distinct() %>%
             arrange(desc(Published)) %>%
@@ -195,43 +257,65 @@ server <- function(input, output, session) {
                       escape = FALSE,
                       rownames = FALSE,
                       options = list(
-                          pageLength = 25,
+                          pageLength = 15,
                           dom = 'tpl',
+                          scrollX = TRUE,
+                          autoWidth = TRUE,
                           columnDefs = list(
-                              list(targets = 2,
-                                   render = JS(
-                                       "function(data, type, row, meta) {",
-                                       "return type === 'display' && data.length > 15 ?",
-                                       "'<span title=\"' + data + '\">' + data.substr(0, 15) + '...</span>' : data;",
-                                       "}")
-                              )
-                          )
-                      ), 
-                      callback = JS('table.page(3).draw(false);'))
-        
+                              list(width = '1600px', targets = 7),
+                              list(width = '500px', targets = 2)
+                          ))
+            )
     })
     
-    output$timelineOutput <- renderPlot(
-
-        plotData() %>%
+    output$timelineOutput <- renderPlot({
+        
+        palette <- hsPalleteMatch %>%
+            inner_join(distinct(plotData(), deckClass),
+                       by = "deckClass") %>%
+            pull(colour)
+        
+        timlinePlotData <- plotData() %>%
             select(Creator = channel_title,
                    Title = title,
+                   Class = deckClass,
                    deckCode,
                    Published) %>%
             distinct() %>%
             count(Published,
+                  Class,
                   name = 'Decks') %>%
-            ggplot(aes(x = Published,
-                       y = Decks)) +
-            geom_histogram(stat = 'identity',
-                           color = '#e95420') +
-            scale_y_continuous(minor_breaks = NULL) +
+            group_by(Class) %>%
+            arrange(Class, Published) %>%
+            mutate(cumSumDecks = cumsum(Decks))
+        
+        ggplot(timlinePlotData) +
+            geom_line(aes(x = Published,
+                          y =  cumSumDecks,
+                          color = Class)) +
+            geom_vline(xintercept = hsCalendar$Released,
+                       lty = 2,
+                       color = 'grey') +
+            geom_text(data = hsCalendar,
+                      aes(x = Released,
+                          y = max(timlinePlotData$cumSumDecks) + max(timlinePlotData$cumSumDecks) * 0.05,
+                          label = Expansion),
+                      angle = 18,
+                      size = 3,
+                      hjust = 0,
+                      vjust = 1) +
+            scale_x_date(limits = c(min(timlinePlotData$Published),
+                                    max(timlinePlotData$Published))) +
+            scale_y_continuous(minor_breaks = NULL,
+                               limits = c(0, 
+                                          max(timlinePlotData$cumSumDecks) + max(timlinePlotData$cumSumDecks) * 0.10)) +
+            scale_color_manual(values = palette) +
             theme_bw() +
             labs(title = 'Decks published by Date.' ,
                  caption = 'Plot respects filters to the left.',
-                 y = '')
-
-    )
+                 y = 'Cumulative number of decks')
+        
+    })
     
     output$commonCardsOutput <- renderPlot({
         
@@ -288,7 +372,7 @@ server <- function(input, output, session) {
             coord_flip()
         
     })
-
+    
     output$creatorDistOutput <- renderPlot({
         
         plotData() %>%
@@ -318,15 +402,6 @@ server <- function(input, output, session) {
 shinyApp(ui = ui, 
          server = server, 
          enableBookmarking = "url")
-
-
-
-
-
-
-
-
-
 
 
 
